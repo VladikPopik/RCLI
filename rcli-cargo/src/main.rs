@@ -3,6 +3,9 @@ use comfy_table::Table;
 use rusqlite::Connection;
 use std::io;
 
+use budget::budget::budget_cycle;
+pub mod budget;
+
 enum Options {
     Budget = 1,
     Reports = 2,
@@ -54,9 +57,11 @@ async fn prestart(){
 
     let create_table_budget = "CREATE TABLE IF NOT EXISTS budgets(
             id INTEGER PRIMARY KEY AUTOINCREMENT,
+            budget_type INTEGER UNIQUE NOT NULL,
             sum FLOAT NOT NULL,
             duration REAL NOT NULL,
-            ts_start REAL NOT NULL
+            ts_start REAL NOT NULL,
+            description TEXT
         );";
     conn.execute(
         create_table_budget,
@@ -67,39 +72,46 @@ async fn prestart(){
 }
 
 async fn on_stop() {
-    let conn = Connection::open_in_memory().unwrap();
+    let conn = Connection::open(
+        "test.db"
+    ).unwrap();
 
-    // conn.backup(name, dst_path, progress)
+    // conn.backup(rusqlite::DatabaseName::Attached("test.db"), "test.db", ());
 }
 
 
 #[tokio::main]
 async fn main() {
+    // -h --version tags for CLI
     let _matches = Command::new("RCLI APP")
         .version("0.1")
         .about("My RCLI app to solve basic routines")
         .get_matches();
-
+    // Initialize or connect to db
     prestart().await;
 
+    // Start Up of RCLI
     println!("@@@@@@@@@@@@@@ START UP @@@@@@@@@@@@@@\n");
     println!("Hello, User!\n");
     println!("There are some functions u can use with me:\n\n");
     option_table_reference().await;
 
+    // Try to get reserved options and only them
     let mut option_code = try_option().await;
-
     while option_code < 0 {
         println!("~~~~~~~~~Ooooops! Try again!~~~~~~~~~\n\n");
         option_table_reference().await;
         option_code = try_option().await;
     }
 
+    // Continue to next phases
     match option_code {
-        1 => println!("BUDGET"),
+        1 => budget_cycle().await,
         2 => println!("REPORTS"),
         _ => println!("NOT IMPLEMENTED YET")
     }
 
-    println!("@@@@@@@@@@@ CYCLE ENDED @@@@@@@@@@@@\n\n")
+    // End of working cycle
+    println!("@@@@@@@@@@@ CYCLE ENDED @@@@@@@@@@@@\n\n");
+    on_stop().await;
 }
