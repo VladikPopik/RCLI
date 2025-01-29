@@ -4,12 +4,14 @@ use rusqlite::Connection;
 use std::io;
 
 use budget::budget::budget_cycle;
+use db::db::DBInstance;
 pub mod budget;
+pub mod db;
 
 enum Options {
     Budget = 1,
     Reports = 2,
-    Todo = -1
+    Todo = -1,
 }
 
 async fn read_option() -> String {
@@ -27,58 +29,20 @@ async fn option_table_reference() {
 
     table
         .set_header(vec!["Budget", "Reports", "TODO"])
-        .add_row(vec![
-            "--budget",
-            "--reports",
-            "--todo",
-        ]);
+        .add_row(vec!["--budget", "--reports", "--todo"]);
 
     println!("  ==> \n{table}\n\n");
 }
 
-async fn try_option() -> isize{
+async fn try_option() -> isize {
     let command_option = read_option().await;
 
     match command_option.as_str() {
         "--budget" => Options::Budget as isize,
         "--reports" => Options::Reports as isize,
-        _ => Options::Todo as isize
+        _ => Options::Todo as isize,
     }
 }
-
-async fn prestart(){
-    let conn = Connection::open(
-        "test.db"
-    ).unwrap();
-
-    let attach = "ATTACH DATABASE IF NOT EXISTS 'test.db' AS test;";
-    let _ = conn.execute(attach, ());
-
-
-    let create_table_budget = "CREATE TABLE IF NOT EXISTS budgets(
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            budget_type INTEGER UNIQUE NOT NULL,
-            sum FLOAT NOT NULL,
-            duration REAL NOT NULL,
-            ts_start REAL NOT NULL,
-            description TEXT
-        );";
-    conn.execute(
-        create_table_budget,
-        (),
-    ).unwrap();
-    // conn.restore(rusqlite::DatabaseName::Attached("test.db"), "test.db", Some(()));
-
-}
-
-async fn on_stop() {
-    let conn = Connection::open(
-        "test.db"
-    ).unwrap();
-
-    // conn.backup(rusqlite::DatabaseName::Attached("test.db"), "test.db", ());
-}
-
 
 #[tokio::main]
 async fn main() {
@@ -88,7 +52,8 @@ async fn main() {
         .about("My RCLI app to solve basic routines")
         .get_matches();
     // Initialize or connect to db
-    prestart().await;
+    let mut db_instance = DBInstance::new("test.db".to_string());
+    db_instance.prestart().await;
 
     // Start Up of RCLI
     println!("@@@@@@@@@@@@@@ START UP @@@@@@@@@@@@@@\n");
@@ -108,10 +73,9 @@ async fn main() {
     match option_code {
         1 => budget_cycle().await,
         2 => println!("REPORTS"),
-        _ => println!("NOT IMPLEMENTED YET")
+        _ => println!("NOT IMPLEMENTED YET"),
     }
 
     // End of working cycle
     println!("@@@@@@@@@@@ CYCLE ENDED @@@@@@@@@@@@\n\n");
-    on_stop().await;
 }
